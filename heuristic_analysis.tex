@@ -1,0 +1,229 @@
+ \documentclass{article}
+\usepackage[utf8]{inputenc}
+\usepackage[margin=1.0in]{geometry}
+\usepackage{listings}
+\usepackage{color}
+\lstset{ %
+basicstyle=\footnotesize,       % the size of the fonts that are used for the code
+numberstyle=\footnotesize,      % the size of the fonts that are used for the line-numbers
+stepnumber=1,                   % the step between two line-numbers. If it is 1 each line will be numbered
+numbersep=5pt,                  % how far the line-numbers are from the code
+backgroundcolor=\color{white},  % choose the background color. You must add \usepackage{color}
+showspaces=false,               % show spaces adding particular underscores
+showstringspaces=false,         % underline spaces within strings
+showtabs=false,                 % show tabs within strings adding particular underscores
+frame=single,           % adds a frame around the code
+}
+\title{Isolation Agent Heuristic Analysis}
+\author{Atanas Abrashev}
+\begin{document}
+\maketitle
+\section{Evaluation functions}
+For this project I experimented with a large number of evaluation functions with varying degrees of success. A few interesting ideas stood out to me, resulting in four particular evaluation functions that I want to talk about in this report.
+
+\subsection{Score with center bias}
+The first evaluation function came from the recognition that the IDImproved agent heuristic is already very strong and it is worth investigating improving it further. To do that, we identify how close to the center the current position is. If it's the same position as the center position we add a small bias of 1. If not, we check if the center position is still legal. If it is, we investigate all possible moves from the current position and check if they fall within the center square, adding a bias of 0.5(smaller, because being able to reach the center is not as good as being in the center). Alternatively, if the center position is not legal, we calculate the cumulative manhattan distance from each possible next position, to the center position and take the average. If the average is less than 1.1 (meaning, that we're pretty close to the center), we add a bias of 0.5. Otherwise, we return the difference in the number of moves as in IDImproved.
+\subsection{Score best square}
+The next idea came from the fact that the center square is not necessarily the best square on the board. The best square is the one which has the biggest number of potential moves from it. To find this square, we simply iterate through all blank squares, trying all the legal moves from them and saving the one which has the most possible moves. To break ties, we chose a square which is closest to the center. Once we have the best position, we can take a similar approach to the one we took in the center bias function. However, for this function, we're completely ignoring the the number of current possible moves for either player. Instead, we calculate the cumulative distance for each legal move of the current player to the best square. We also do the same thing for the opponent. Finally, we subtract the current player distance from the opponent distance to get the final result, because bigger distance from the center square means worse results.
+\subsection{Score best square improved v1}
+The next function combines ideas from the previous two and adds a few improvements. To improve the best square function we speed the calculation by ignoring the ties when we count the number of possible legal moves to find the best position on the board. As long as we pick one of the squares which has the maximum number of possible moves, we are happy. Secondly,like with the center bias function, we treat the distance as a bias. However, the way we do that is not by using a constant factor. We take the difference between the average distance for the opponent and the current player to the best square, and we add that to the IDImproved score. By doing that, we still add value to the number of possible positions from the current position. However we also make sure that we give some bias to how good strategically the next position is going to be. 
+\subsection{Score best square improved v2}
+The final evaluation function tries to improve upon the previous one. It calculates the best square and the distances in a similar fashion. However, we also check if there is an immediate move that leads directly to the best square. If only one of the players has a move to that square we make sure to add extra bias to how good or bad the position is. The reasoning behind this is that if the current player doesn't have access to the best move, but the opponent does, the opponent is likely to take that move next, which is the main weakness of our heuristic to measure the closeness to the best square.
+\section{Performance Data}
+To gather performance data, I created a Custom Player for each of my agents and modified the tournament utility to be able to make them fight each other. The name of the players are CentreBias, BestSquare, Student and SmarterBestSquare and use functions 1.1, 1.2, 1.3 and 1.4 respectively. Here is an example run of 20 games for each possible combination:
+\begin{lstlisting}
+(aind) >  aind-isolation python tournament.py
+
+This script evaluates the performance of the custom heuristic function by
+comparing the strength of an agent using iterative deepening (ID) search with
+alpha-beta pruning against the strength rating of agents using other heuristic
+functions.  The `ID_Improved` agent provides a baseline by measuring the
+performance of a basic agent using Iterative Deepening and the "improved"
+heuristic (from lecture) on your hardware.  The `Student` agent then measures
+the performance of Iterative Deepening and the custom heuristic against the
+same opponents.
+
+
+*************************
+ Evaluating: ID_Improved 
+*************************
+
+Playing Matches:
+----------
+  Match 1: ID_Improved vs   Student     Result: 9 to 11
+  Match 2: ID_Improved vs BestSquare    Result: 14 to 6
+  Match 3: ID_Improved vs CentreBias    Result: 9 to 11
+  Match 4: ID_Improved vs SmarterBestSquare     Result: 7 to 13
+  Match 5: ID_Improved vs   Random      Result: 18 to 2
+  Match 6: ID_Improved vs   MM_Open     Result: 13 to 7
+  Match 7: ID_Improved vs MM_Improved   Result: 11 to 9
+  Match 8: ID_Improved vs   AB_Open     Result: 15 to 5
+  Match 9: ID_Improved vs AB_Improved   Result: 11 to 9
+
+
+Results:
+----------
+ID_Improved              59.44%
+
+*************************
+   Evaluating: Student   
+*************************
+
+Playing Matches:
+----------
+  Match 1:   Student   vs BestSquare    Result: 13 to 7
+  Match 2:   Student   vs CentreBias    Result: 10 to 10
+  Match 3:   Student   vs SmarterBestSquare     Result: 10 to 10
+  Match 4:   Student   vs ID_Improved   Result: 9 to 11
+  Match 5:   Student   vs   Random      Result: 17 to 3
+  Match 6:   Student   vs   MM_Open     Result: 12 to 8
+  Match 7:   Student   vs MM_Improved   Result: 15 to 5
+  Match 8:   Student   vs   AB_Open     Result: 13 to 7
+  Match 9:   Student   vs AB_Improved   Result: 13 to 7
+
+
+Results:
+----------
+Student                  62.22%
+
+*************************
+ Evaluating: BestSquare  
+*************************
+
+Playing Matches:
+----------
+  Match 1: BestSquare  vs   Student     Result: 6 to 14
+  Match 2: BestSquare  vs CentreBias    Result: 11 to 9
+  Match 3: BestSquare  vs SmarterBestSquare     Result: 11 to 9
+  Match 4: BestSquare  vs ID_Improved   Result: 8 to 12
+  Match 5: BestSquare  vs   Random      Result: 19 to 1
+  Match 6: BestSquare  vs   MM_Open     Result: 12 to 8
+  Match 7: BestSquare  vs MM_Improved   Result: 13 to 7
+  Match 8: BestSquare  vs   AB_Open     Result: 13 to 7
+  Match 9: BestSquare  vs AB_Improved   Result: 12 to 8
+
+
+Results:
+----------
+BestSquare               58.33%
+
+*************************
+ Evaluating: CentreBias  
+*************************
+
+Playing Matches:
+----------
+  Match 1: CentreBias  vs   Student     Result: 9 to 11
+  Match 2: CentreBias  vs BestSquare    Result: 14 to 6
+  Match 3: CentreBias  vs SmarterBestSquare     Result: 7 to 13
+  Match 4: CentreBias  vs ID_Improved   Result: 10 to 10
+  Match 5: CentreBias  vs   Random      Result: 15 to 5
+  Match 6: CentreBias  vs   MM_Open     Result: 15 to 5
+  Match 7: CentreBias  vs MM_Improved   Result: 10 to 10
+  Match 8: CentreBias  vs   AB_Open     Result: 11 to 9
+  Match 9: CentreBias  vs AB_Improved   Result: 11 to 9
+
+
+Results:
+----------
+CentreBias               56.67%
+
+*************************
+Evaluating: SmarterBestSquare
+*************************
+
+Playing Matches:
+----------
+  Match 1: SmarterBestSquare vs   Student       Result: 11 to 9
+  Match 2: SmarterBestSquare vs BestSquare      Result: 12 to 8
+  Match 3: SmarterBestSquare vs CentreBias      Result: 11 to 9
+  Match 4: SmarterBestSquare vs ID_Improved     Result: 8 to 12
+  Match 5: SmarterBestSquare vs   Random        Result: 16 to 4
+  Match 6: SmarterBestSquare vs   MM_Open       Result: 13 to 7
+  Match 7: SmarterBestSquare vs MM_Improved     Result: 13 to 7
+  Match 8: SmarterBestSquare vs   AB_Open       Result: 11 to 9
+  Match 9: SmarterBestSquare vs AB_Improved     Result: 14 to 6
+
+
+Results:
+----------
+SmarterBestSquare        60.56%
+\end{lstlisting}
+
+And finally, here is a table of winrate percentages, where each Custom Agent was put against the other agents over 200 games overnight to determine to try and eliminate random skew in the results, ordered by winrate:
+\vspace{5mm}
+
+\begin{tabular}{ l | c  r }
+  Agent & Winrate \\ \hline
+  Student & 63.67\% \\
+  SmarterBestSquare & 61.39\% \\
+  ID Improved & 60.3\% \\
+  CentreBias & 58.39\% \\
+  BestSquare & 48.56\% \\ 
+\end{tabular}
+
+\section{Conclusions and the evaluation function picked}
+The results show that the evaluation function described in 1.3 is a clear winner in the tournament in terms of overall results, and that's why it was picked to be the main evaluation function for this submission.
+
+Individually, it is also the best function overall as it manages to beat the biggest number of agents in it's own tournament.
+
+Let's define a win as having a bigger winrate over N number of games and loss as the opposite of that. As you can see below IDImproved lost to both Student and SmarterBestSquare. Student lost only to SmarterBestSquare and SmarterBestSquare lost to both CentreBias and Student.
+
+Even though SmarterBestSquare has the potential to beat Student in a 1v1 tournament, it is more specific and exploitable by other agents and focuses too much on the best position heuristic I described above. It also takes more time for extra computations, which given the exponential nature of the problem, can be very expensive making SmarterBestSquare a risky choice against faster agents.
+
+\vspace{15mm}
+
+\begin{lstlisting}
+*************************
+ Evaluating: ID_Improved 
+*************************
+
+Playing Matches:
+----------
+  Match 1: ID_Improved vs BestSquare  	Result: 125 to 75
+  Match 2: ID_Improved vs CentreBias  	Result: 105 to 95
+  Match 3: ID_Improved vs SmarterBestSquare 	Result: 95 to 105
+  Match 4: ID_Improved vs   Student   	Result: 97 to 103
+  Match 5: ID_Improved vs   Random    	Result: 177 to 23
+  Match 6: ID_Improved vs   MM_Open   	Result: 130 to 70
+  Match 7: ID_Improved vs MM_Improved 	Result: 122 to 78
+  Match 8: ID_Improved vs   AB_Open   	Result: 118 to 82
+  Match 9: ID_Improved vs AB_Improved 	Result: 117 to 83
+\end{lstlisting}
+
+\begin{lstlisting}
+*************************
+   Evaluating: Student   
+*************************
+
+Playing Matches:
+----------
+  Match 1:   Student   vs ID_Improved 	Result: 111 to 89
+  Match 2:   Student   vs BestSquare  	Result: 139 to 61
+  Match 3:   Student   vs CentreBias  	Result: 112 to 88
+  Match 4:   Student   vs SmarterBestSquare 	Result: 98 to 102
+  Match 5:   Student   vs   Random    	Result: 173 to 27
+  Match 6:   Student   vs   MM_Open   	Result: 142 to 58
+  Match 7:   Student   vs MM_Improved 	Result: 125 to 75
+  Match 8:   Student   vs   AB_Open   	Result: 128 to 72
+  Match 9:   Student   vs AB_Improved 	Result: 118 to 82
+
+\end{lstlisting}
+\begin{lstlisting}
+*************************
+Evaluating: SmarterBestSquare
+*************************
+
+Playing Matches:
+----------
+  Match 1: SmarterBestSquare vs ID_Improved 	Result: 100 to 100
+  Match 2: SmarterBestSquare vs BestSquare  	Result: 124 to 76
+  Match 3: SmarterBestSquare vs CentreBias  	Result: 98 to 102
+  Match 4: SmarterBestSquare vs   Student   	Result: 99 to 101
+  Match 5: SmarterBestSquare vs   Random    	Result: 170 to 30
+  Match 6: SmarterBestSquare vs   MM_Open   	Result: 140 to 60
+  Match 7: SmarterBestSquare vs MM_Improved 	Result: 132 to 68
+  Match 8: SmarterBestSquare vs   AB_Open   	Result: 119 to 81
+  Match 9: SmarterBestSquare vs AB_Improved 	Result: 123 to 77
+\end{lstlisting}
+\end{document}
